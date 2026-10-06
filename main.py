@@ -8,7 +8,7 @@ import telebot
 from telebot import types
 
 # ----------------- CONFIGURATION -----------------
-BOT_TOKEN = "⚠️⚠️⚠️⚠️⚠️⚠️ BOT TOKEN"
+BOT_TOKEN = "8830637060:AAFnG2r8oQE0e9qLFd7sCPQRa8BTaD2L3gs"
 
 # 4 Force-Join Channels configuration
 CHANNELS = [
@@ -21,10 +21,9 @@ CHANNELS = [
 ADMIN_ID = 8671410379
 
 # API Endpoints
-API_NUMBER_INFO  = "⚠️⚠️⚠️⚠️⚠️⚠️ API 1 (Number to Info)"
-API_VEHICLE_INFO = "⚠️⚠️⚠️⚠️⚠️⚠️ API 2 (Vehicle Info)"
-API_AADHAR_INFO  = "⚠️⚠️⚠️⚠️⚠️⚠️ API 3 (Aadhar to Info)"
-API_TG_INFO      = "⚠️⚠️⚠️⚠️⚠️⚠️ API 4 (TG to Number)"
+API_NUMBER_INFO  = "https://api-hub-alpha.vercel.app/api/number-info?key=cybershrfreedemo_9cc8ad86ccdcd8cc53&mobile=9876543210"
+API_VEHICLE_INFO = "https://api-hub-alpha.vercel.app/api/vehicle-info?key=cybershrfreedemo_9cc8ad86ccdcd8cc53&number=UP33BH4112"
+API_AADHAR_INFO  = "https://api-hub-alpha.vercel.app/api/family-info?key=cybershrfreedemo_9cc8ad86ccdcd8cc53&aadhar=123456789012"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
