@@ -2,15 +2,18 @@ import os
 import sqlite3
 import datetime
 import threading
+import time
 import requests
 from flask import Flask
 import telebot
 from telebot import types
 
 # ----------------- CONFIGURATION -----------------
-BOT_TOKEN = "8830637060:AAFnG2r8oQE0e9qLFd7sCPQRa8BTaD2L3gs"
+BOT_TOKEN = "8830637060:AAFsUBFtG8YBGzwdy9B5Av65D30T-A3T1-k"
 
-# 4 Force-Join Channels configuration
+ADMIN_ID = 8671410379
+
+# 4 Force-Join Channels
 CHANNELS = [
     {"chat_id": -1003871657552, "name": "Channel 1", "link": "https://t.me/+asPUGy4JXdBiZjU1"},
     {"chat_id": "@Ox1MODS", "name": "OX 1 MODS", "link": "https://t.me/Ox1MODS"},
@@ -18,12 +21,11 @@ CHANNELS = [
     {"chat_id": -1003782903063, "name": "OX MODS", "link": "https://t.me/+852hkOgj0UNlZGU9"}
 ]
 
-ADMIN_ID = 8671410379
-
 # API Endpoints
 API_NUMBER_INFO  = "https://api-hub-alpha.vercel.app/api/number-info?key=cybershrfreedemo_9cc8ad86ccdcd8cc53&mobile=9876543210"
 API_VEHICLE_INFO = "https://api-hub-alpha.vercel.app/api/vehicle-info?key=cybershrfreedemo_9cc8ad86ccdcd8cc53&number=UP33BH4112"
-API_AADHAR_INFO  = "https://api-hub-alpha.vercel.app/api/family-info?key=cybershrfreedemo_9cc8ad86ccdcd8cc53&aadhar=123456789012"
+API_AADHAR_INFO  = "https://api-hub-alpha.vercel.app/api/aadhaar?key=cybershrfreedemo_9cc8ad86ccdcd8cc53&id=123456789012"
+API_FAMILY_INFO  = "https://api-hub-alpha.vercel.app/api/family-info?key=cybershrfreedemo_9cc8ad86ccdcd8cc53&aadhar=123456789012"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
@@ -77,6 +79,10 @@ def register_user(user_id, referrer_id=None):
         cursor.execute("INSERT INTO users (user_id, balance, referred_by) VALUES (?, 10, ?)", (user_id, referrer_id))
         if referrer_id and referrer_id != user_id:
             cursor.execute("UPDATE users SET balance = balance + 5 WHERE user_id = ?", (referrer_id,))
+            try:
+                bot.send_message(referrer_id, "🎉 <b>Referral Bonus!</b> Someone joined using your link. +5 Credits added.")
+            except Exception:
+                pass
         conn.commit()
     conn.close()
 
@@ -87,14 +93,15 @@ def deduct_credit(user_id, amount=1):
     conn.commit()
     conn.close()
 
-def add_user_credit(user_id, amount):
+def get_all_users():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amount, user_id))
-    conn.commit()
+    cursor.execute("SELECT user_id FROM users")
+    rows = cursor.fetchall()
     conn.close()
+    return [r[0] for r in rows]
 
-# ----------------- FORCE JOIN CHECK -----------------
+# ----------------- FORCE JOIN VERIFICATION -----------------
 def is_user_joined(user_id):
     if user_id == ADMIN_ID:
         return True
@@ -114,7 +121,7 @@ def force_join_markup():
     markup.add(types.InlineKeyboardButton(text="✅ Check Access", callback_data="verify_join"))
     return markup
 
-# ----------------- KEYBOARDS -----------------
+# ----------------- KEYBOARD MENUS -----------------
 def main_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(
@@ -123,7 +130,7 @@ def main_menu():
     )
     markup.add(
         types.KeyboardButton("🆔 Aadhar to Info"),
-        types.KeyboardButton("✈️ TG to Number")
+        types.KeyboardButton("👨‍👩‍👧 Family Info")
     )
     markup.add(
         types.KeyboardButton("💰 My Balance"),
@@ -134,12 +141,12 @@ def main_menu():
     )
     return markup
 
-# ----------------- RENDER KEEP-ALIVE SERVER -----------------
+# ----------------- FLASK KEEP-ALIVE SERVER -----------------
 app = Flask("")
 
 @app.route("/")
 def home():
-    return "Bot is running healthy 24/7!"
+    return "Bot is running 24/7!"
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
@@ -159,7 +166,7 @@ def handle_start(message):
     if not is_user_joined(user_id):
         bot.send_message(
             user_id,
-            "⚠️ <b>Access Denied!</b>\n\nYou must join all our official channels to use this bot. Click the buttons below to join, then tap <b>Check Access</b>.",
+            "⚠️ <b>Access Denied!</b>\n\nYou must join all official channels to use this bot.\nJoin them and tap <b>Check Access</b>.",
             reply_markup=force_join_markup()
         )
         return
@@ -168,9 +175,9 @@ def handle_start(message):
     bot.send_message(
         user_id,
         f"👋 <b>Welcome {message.from_user.first_name}!</b>\n\n"
-        f"🎁 <b>Welcome Bonus:</b> 10 Credits added to your wallet!\n"
+        f"🎁 <b>Welcome Bonus:</b> 10 Credits added to your account!\n"
         f"💰 <b>Current Balance:</b> {bal} Credits\n\n"
-        f"Select any option below to begin searching:",
+        f"Choose an option below to search:",
         reply_markup=main_menu()
     )
 
@@ -182,15 +189,15 @@ def handle_verification(call):
         bal = get_user_balance(user_id)
         bot.send_message(
             user_id,
-            f"✅ <b>Access Approved!</b>\n\n"
+            f"✅ <b>Access Verified!</b>\n\n"
             f"Your current balance: <b>{bal} Credits</b>\n"
-            f"Use the menu below to search:",
+            f"Select any option below to begin:",
             reply_markup=main_menu()
         )
     else:
         bot.answer_callback_query(call.id, "❌ You haven't joined all channels yet!", show_alert=True)
 
-# ----------------- ADMIN COMMANDS -----------------
+# ----------------- ADMIN COMMANDS (/gen & /broadcast) -----------------
 @bot.message_handler(commands=["gen"])
 def generate_code_handler(message):
     if message.from_user.id != ADMIN_ID:
@@ -207,7 +214,7 @@ def generate_code_handler(message):
         credits = int(parts[2])
         max_uses = int(parts[3])
     except ValueError:
-        bot.reply_to(message, "❌ Credits aur max uses number format me hone chahiye.")
+        bot.reply_to(message, "❌ Credits and uses must be numbers.")
         return
 
     conn = get_db_connection()
@@ -221,22 +228,60 @@ def generate_code_handler(message):
             f"🎟️ <b>Gift Code Created!</b>\n\n"
             f"🔹 <b>Code:</b> <code>{code}</code>\n"
             f"🔹 <b>Reward:</b> <code>{credits} Credits</code>\n"
-            f"🔹 <b>Max Limit:</b> <code>{max_uses} Users</code>"
+            f"🔹 <b>Max Uses:</b> <code>{max_uses} Users</code>"
         )
     except sqlite3.IntegrityError:
-        bot.reply_to(message, "❌ Yeh code pehle se exist karta hai!")
+        bot.reply_to(message, "❌ This code already exists!")
     finally:
         conn.close()
 
-# ----------------- USER INTERACTIONS -----------------
+@bot.message_handler(commands=["broadcast"])
+def broadcast_handler(message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    # User can reply to a message with /broadcast OR write /broadcast <text>
+    target_msg = message.reply_to_message if message.reply_to_message else None
+    broadcast_text = message.text.replace("/broadcast", "").strip()
+
+    if not target_msg and not broadcast_text:
+        bot.reply_to(message, "⚠️ <b>Usage:</b>\n1. Type <code>/broadcast Your message here</code>\n2. Or reply to any message/photo with <code>/broadcast</code>.")
+        return
+
+    all_users = get_all_users()
+    status_msg = bot.send_message(message.chat.id, f"📢 <i>Broadcasting to {len(all_users)} users...</i>")
+
+    success_count = 0
+    failed_count = 0
+
+    for uid in all_users:
+        try:
+            if target_msg:
+                bot.copy_message(chat_id=uid, from_chat_id=message.chat.id, message_id=target_msg.message_id)
+            else:
+                bot.send_message(uid, broadcast_text)
+            success_count += 1
+            time.sleep(0.04)  # Rate limiting protection
+        except Exception:
+            failed_count += 1
+
+    bot.edit_message_text(
+        f"✅ <b>Broadcast Completed!</b>\n\n"
+        f"📤 <b>Delivered:</b> {success_count}\n"
+        f"❌ <b>Failed / Blocked:</b> {failed_count}",
+        chat_id=message.chat.id,
+        message_id=status_msg.message_id
+    )
+
+# ----------------- USER ACTIONS & SEARCH -----------------
 @bot.message_handler(func=lambda msg: True)
-def handle_menu_and_inputs(message):
+def handle_user_actions(message):
     user_id = message.from_user.id
 
     if not is_user_joined(user_id):
         bot.send_message(
             user_id,
-            "⚠️ <b>Access Denied!</b>\n\nYou must join all our official channels to use this service.",
+            "⚠️ <b>Access Denied!</b>\n\nYou must join all official channels to use this bot.",
             reply_markup=force_join_markup()
         )
         return
@@ -254,7 +299,7 @@ def handle_menu_and_inputs(message):
         bot.send_message(
             user_id,
             f"🎁 <b>Refer & Earn Program</b>\n\n"
-            f"Share your referral link with your friends and earn <b>5 Credits</b> per user join!\n\n"
+            f"Share your referral link with friends and get <b>5 Credits</b> per new join!\n\n"
             f"🔗 <b>Your Link:</b>\n<code>{ref_link}</code>"
         )
         return
@@ -264,28 +309,28 @@ def handle_menu_and_inputs(message):
         bot.send_message(user_id, "🎟️ Please enter your Redeem Code:")
         return
 
-    # Handle Service Selectors
+    # Menu Selectors
     if text == "📞 Number to Info":
         user_states[user_id] = "SEARCH_NUMBER"
-        bot.send_message(user_id, "🔍 <b>Number to Info</b>\n\nSend a 10-digit Indian mobile number (without +91):\nExample: <code>9876543210</code>")
+        bot.send_message(user_id, "🔍 <b>Number to Info</b>\n\nSend a 10-digit Indian phone number (without +91):\nExample: <code>9876543210</code>")
         return
 
     if text == "🚗 Vehicle Info":
         user_states[user_id] = "SEARCH_VEHICLE"
-        bot.send_message(user_id, "🚗 <b>Vehicle Info</b>\n\nEnter vehicle RC registration number:\nExample: <code>UP52AB1234</code>")
+        bot.send_message(user_id, "🚗 <b>Vehicle Info</b>\n\nEnter Vehicle Number:\nExample: <code>UP33BH4112</code>")
         return
 
     if text == "🆔 Aadhar to Info":
         user_states[user_id] = "SEARCH_AADHAR"
-        bot.send_message(user_id, "🆔 <b>Aadhar Info</b>\n\nEnter 12-digit Aadhaar Number:\nExample: <code>222149609562</code>")
+        bot.send_message(user_id, "🆔 <b>Aadhar Info</b>\n\nEnter Aadhaar Number:")
         return
 
-    if text == "✈️ TG to Number":
-        user_states[user_id] = "SEARCH_TG"
-        bot.send_message(user_id, "✈️ <b>TG to Number</b>\n\nEnter Telegram User ID or Username:")
+    if text == "👨‍👩‍👧 Family Info":
+        user_states[user_id] = "SEARCH_FAMILY"
+        bot.send_message(user_id, "👨‍👩‍👧 <b>Family Info</b>\n\nEnter Aadhaar Number for Family details:")
         return
 
-    # Redeem State Processing
+    # Redeem Execution
     if user_states.get(user_id) == "AWAITING_CODE":
         code_input = text
         conn = get_db_connection()
@@ -299,56 +344,63 @@ def handle_menu_and_inputs(message):
             credits, max_uses, times_used = code_data
             cursor.execute("SELECT 1 FROM redeemed_history WHERE code = ? AND user_id = ?", (code_input, user_id))
             if cursor.fetchone():
-                bot.send_message(user_id, "⚠️ You have already redeemed this code!")
+                bot.send_message(user_id, "⚠️ You have already claimed this code!")
             elif times_used >= max_uses:
-                bot.send_message(user_id, "❌ This code has reached its maximum usage limit!")
+                bot.send_message(user_id, "❌ Code usage limit exceeded!")
             else:
                 cursor.execute("INSERT INTO redeemed_history (code, user_id) VALUES (?, ?)", (code_input, user_id))
                 cursor.execute("UPDATE promo_codes SET times_used = times_used + 1 WHERE code = ?", (code_input,))
                 cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (credits, user_id))
                 conn.commit()
-                bot.send_message(user_id, f"🎉 <b>Success!</b>\n\n<b>{credits} Credits</b> have been added to your balance.")
+                bot.send_message(user_id, f"🎉 <b>Success!</b>\n\n<b>{credits} Credits</b> added to your account.")
         conn.close()
         user_states.pop(user_id, None)
         return
 
     # Search Execution
     state = user_states.get(user_id)
-    if state in ["SEARCH_NUMBER", "SEARCH_VEHICLE", "SEARCH_AADHAR", "SEARCH_TG"]:
+    if state in ["SEARCH_NUMBER", "SEARCH_VEHICLE", "SEARCH_AADHAR", "SEARCH_FAMILY"]:
         balance = get_user_balance(user_id)
         if balance < 1:
-            bot.send_message(user_id, "❌ <b>Insufficient Balance!</b>\n\nYou need at least 1 credit to perform a search. Use <b>Refer & Earn</b> or redeem a code to get credits.")
+            bot.send_message(user_id, "❌ <b>Insufficient Balance!</b>\n\nYou need at least 1 credit to search. Use <b>Refer & Earn</b> or redeem a code.")
             user_states.pop(user_id, None)
             return
 
-        query_value = text
-        status_msg = bot.send_message(user_id, "⚡ <i>Processing your search... Please wait...</i>")
+        query_val = text
+        status_msg = bot.send_message(user_id, "⚡ <i>Searching records... Please wait...</i>")
 
-        # Map correct API
         api_url = ""
         if state == "SEARCH_NUMBER":
-            api_url = f"{API_NUMBER_INFO}?num={query_value}"
+            api_url = f"{API_NUMBER_INFO}&mobile={query_val}"
         elif state == "SEARCH_VEHICLE":
-            api_url = f"{API_VEHICLE_INFO}?rc={query_value}"
+            api_url = f"{API_VEHICLE_INFO}&number={query_val}"
         elif state == "SEARCH_AADHAR":
-            api_url = f"{API_AADHAR_INFO}?uid={query_value}"
-        elif state == "SEARCH_TG":
-            api_url = f"{API_TG_INFO}?tgid={query_value}"
+            api_url = f"{API_AADHAR_INFO}&id={query_val}"
+        elif state == "SEARCH_FAMILY":
+            api_url = f"{API_FAMILY_INFO}&aadhar={query_val}"
 
         records = []
         try:
-            resp = requests.get(api_url, timeout=20)
-            data = resp.json()
+            resp = requests.get(api_url, timeout=25)
+            res_json = resp.json()
 
-            # Normalize data into list of records
-            if isinstance(data, list):
-                records = data
-            elif isinstance(data, dict):
-                records = data.get("records") or data.get("result") or [data]
-        except Exception:
+            if isinstance(res_json, dict):
+                inner_data = res_json.get("data")
+                if isinstance(inner_data, dict):
+                    records = inner_data.get("data") or [inner_data]
+                elif isinstance(inner_data, list):
+                    records = inner_data
+                elif "result" in res_json:
+                    records = res_json.get("result")
+                else:
+                    records = [res_json]
+            elif isinstance(res_json, list):
+                records = res_json
+        except Exception as e:
+            print("API error:", e)
             records = []
 
-        if not records:
+        if not records or (isinstance(records, list) and len(records) == 0):
             bot.edit_message_text("❌ No information was found for this query.", chat_id=user_id, message_id=status_msg.message_id)
             user_states.pop(user_id, None)
             return
@@ -357,16 +409,18 @@ def handle_menu_and_inputs(message):
         deduct_credit(user_id, 1)
         current_bal = get_user_balance(user_id)
 
-        # Build Card Output
+        # Build Clean Text Output (matches screenshot formatting)
         output_blocks = []
         for index, item in enumerate(records, start=1):
-            name = item.get("name", "N/A")
-            address = item.get("address", "N/A")
-            aadhaar = item.get("aadhaar") or item.get("aadhar", "N/A")
-            alt = item.get("alt") or item.get("alt_mobile", "N/A")
-            circle = item.get("circle", "N/A")
-            father = item.get("father") or item.get("father_name", "N/A")
-            num = item.get("num") or item.get("mobile", query_value)
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name") or "N/A"
+            address = item.get("address") or "N/A"
+            aadhaar = item.get("id") or item.get("aadhaar") or item.get("aadhar") or "N/A"
+            alt = item.get("alt_number") or item.get("alt") or item.get("alt_mobile") or "N/A"
+            circle = item.get("circle") or "N/A"
+            father = item.get("father_name") or item.get("father") or "N/A"
+            num = item.get("mobile") or item.get("number") or query_val
 
             block = (
                 f"[ RECORD {index} ]\n"
@@ -381,6 +435,11 @@ def handle_menu_and_inputs(message):
             )
             output_blocks.append(block)
 
+        if not output_blocks:
+            bot.edit_message_text("❌ No information was found for this query.", chat_id=user_id, message_id=status_msg.message_id)
+            user_states.pop(user_id, None)
+            return
+
         current_time_str = datetime.datetime.now().strftime("%d-%b-%Y %I:%M %p")
         result_text = "\n\n".join(output_blocks)
         result_text += (
@@ -391,15 +450,16 @@ def handle_menu_and_inputs(message):
         )
 
         bot.delete_message(user_id, status_msg.message_id)
-        bot.send_message(user_id, f"<code>{result_text}</code>", parse_mode="HTML")
+        # Sent as clean regular text (no full-box monospace)
+        bot.send_message(user_id, result_text)
         user_states.pop(user_id, None)
 
 # ----------------- START APPLICATION -----------------
 if __name__ == "__main__":
-    # Start web keep-alive server in background
     web_thread = threading.Thread(target=run_web)
     web_thread.daemon = True
     web_thread.start()
 
-    print("Bot is starting polling...")
+    print("Bot is successfully running...")
     bot.infinity_polling(skip_pending=True)
+                                     
