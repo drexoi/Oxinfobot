@@ -12,13 +12,12 @@ import telebot
 from telebot import types
 
 # ----------------- CONFIGURATION -----------------
-BOT_TOKEN = "8830637060:AAGsVL5TZJioEhbWBteoOJYKRMMrrpNLuCA"
+BOT_TOKEN = "⚠️⚠️⚠️⚠️⚠️⚠️ BOT TOKEN"
 
 ADMIN_ID = 8671410379
 UPI_ID = "oxrehan11@oksbi"
 PAYEE_NAME = "OxRehan"
 
-# Official Channel for "Coming Soon" & Force Join
 PRIMARY_CHANNEL_LINK = "https://t.me/+asPUGy4JXdBiZjU1"
 
 CHANNELS = [
@@ -28,10 +27,12 @@ CHANNELS = [
     {"name": "OX MODS 📢", "link": "https://t.me/+852hkOgj0UNlZGU9"}
 ]
 
-# Live Number Info API
 API_NUMBER_INFO = "https://api-hub-alpha.vercel.app/api/number-info?key=cybershrfreedemo_9cc8ad86ccdcd8cc53"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+
+# In-memory instant verified cache
+verified_users = set()
 
 # ----------------- DATABASE SETUP -----------------
 def init_db():
@@ -40,7 +41,7 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
-            balance INTEGER DEFAULT 10,
+            balance INTEGER DEFAULT 5,
             has_verified INTEGER DEFAULT 0,
             referred_by INTEGER
         )
@@ -77,6 +78,7 @@ def get_user_data(user_id):
     return row if row else (0, 0)
 
 def set_user_verified(user_id):
+    verified_users.add(user_id)
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET has_verified = 1 WHERE user_id = ?", (user_id,))
@@ -86,16 +88,21 @@ def set_user_verified(user_id):
 def register_user(user_id, referrer_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
-    if not cursor.fetchone():
-        cursor.execute("INSERT INTO users (user_id, balance, has_verified, referred_by) VALUES (?, 10, 0, ?)", (user_id, referrer_id))
+    cursor.execute("SELECT user_id, has_verified FROM users WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if not row:
+        # Initial balance 5 credits
+        cursor.execute("INSERT INTO users (user_id, balance, has_verified, referred_by) VALUES (?, 5, 0, ?)", (user_id, referrer_id))
         if referrer_id and referrer_id != user_id:
             cursor.execute("UPDATE users SET balance = balance + 10 WHERE user_id = ?", (referrer_id,))
             try:
-                bot.send_message(referrer_id, "🎉 <b>Referral Bonus!</b> Someone joined using your link. +10 Credits added!")
+                bot.send_message(referrer_id, "🎉 <b>Referral Bonus!</b> Someone joined via your link.\n+10 Credits added!")
             except Exception:
                 pass
         conn.commit()
+    else:
+        if row[1] == 1:
+            verified_users.add(user_id)
     conn.close()
 
 def deduct_credit(user_id, amount=1):
@@ -185,8 +192,8 @@ def handle_start(message):
     register_user(user_id, referrer)
     bal, has_verified = get_user_data(user_id)
 
-    # Agar user verified nahi hai to force-join button 100% aayega
-    if not has_verified:
+    # Agar user verified nahi hai to force join card aayega
+    if user_id not in verified_users and not has_verified:
         bot.send_message(
             user_id,
             "⚠️ <b>Access Denied!</b>\n\nYou must join all our 4 official channels below to use this bot.\n\nAfter joining, tap <b>Check Access</b> to unlock features.",
@@ -197,7 +204,7 @@ def handle_start(message):
     bot.send_message(
         user_id,
         f"👋 <b>Welcome {message.from_user.first_name}!</b>\n\n"
-        f"🎁 <b>Welcome Bonus:</b> 10 Credits added to your account!\n"
+        f"🎁 <b>Welcome Bonus:</b> 5 Credits added to your account!\n"
         f"💰 <b>Current Balance:</b> {bal} Credits\n\n"
         f"Choose an option below to search:",
         reply_markup=main_menu()
@@ -207,6 +214,8 @@ def handle_start(message):
 def handle_verification(call):
     user_id = call.from_user.id
     set_user_verified(user_id)
+
+    # Button wala message delete karke fresh main menu open karega
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
@@ -216,7 +225,8 @@ def handle_verification(call):
     bot.send_message(
         user_id,
         f"✅ <b>Access Approved!</b>\n\n"
-        f"Your current balance: <b>{bal} Credits</b>\n"
+        f"🎁 <b>Welcome Bonus:</b> 5 Credits added!\n"
+        f"💰 <b>Your Balance:</b> {bal} Credits\n\n"
         f"Select an option below to search:",
         reply_markup=main_menu()
     )
@@ -232,7 +242,6 @@ def process_plan_selection(call):
     note = f"Credits_{credits}_{user_id}"
     upi_payload = f"upi://pay?pa={UPI_ID}&pn={urllib.parse.quote(PAYEE_NAME)}&am={amount}&cu=INR&tn={note}"
 
-    # Generate QR Code image in memory via Python qrcode
     qr = qrcode.QRCode(box_size=8, border=2)
     qr.add_data(upi_payload)
     qr.make(fit=True)
@@ -345,10 +354,10 @@ def handle_all_messages(message):
     user_id = message.from_user.id
     bal, has_verified = get_user_data(user_id)
 
-    if not has_verified:
+    if user_id not in verified_users and not has_verified:
         bot.send_message(
             user_id,
-            "⚠️ <b>Access Denied!</b>\n\nPlease join our official channels to use this bot.",
+            "⚠️ <b>Access Denied!</b>\n\nPlease join our official channels to use the bot.",
             reply_markup=force_join_markup()
         )
         return
@@ -396,7 +405,7 @@ def handle_all_messages(message):
         )
         return
 
-    # Only Number to Info is Active
+    # Active Service: Number to Info
     if text == "📞 Number to Info":
         user_states[user_id] = "SEARCH_NUMBER"
         bot.send_message(user_id, "🔍 <b>Number to Info</b>\n\nSend a 10-digit Indian phone number (without +91):\nExample: <code>9876543210</code>")
@@ -429,7 +438,7 @@ def handle_all_messages(message):
         user_states.pop(user_id, None)
         return
 
-    # Perform Number Search
+    # Perform Search
     if user_states.get(user_id) == "SEARCH_NUMBER":
         bal, _ = get_user_data(user_id)
         if bal < 1:
@@ -526,4 +535,3 @@ if __name__ == "__main__":
             bot.infinity_polling(skip_pending=True, timeout=20)
         except Exception:
             time.sleep(3)
-    
