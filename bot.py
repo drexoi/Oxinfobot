@@ -12,7 +12,7 @@ import telebot
 from telebot import types
 
 # ----------------- CONFIGURATION -----------------
-BOT_TOKEN = "⚠️⚠️⚠️⚠️⚠️⚠️ BOT TOKEN"
+BOT_TOKEN = "8830637060:AAEEA9esxQSNbsMvhJnLqRCOW6j04rKBYgo"
 
 ADMIN_ID = 8671410379
 UPI_ID = "oxrehan11@oksbi"
